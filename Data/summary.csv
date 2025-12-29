@@ -1,0 +1,43 @@
+Earnings Month,Payout Month,PSID,Address,State,Collection Detail Host,Gross Collected,Booking Fees Amount,Collections Net of Booking Fees,Transaction Fee,Service Fees,Host Earnings
+2023-03,2023-04,2464,302 Spring Street,Virginia,Carlos Noyes,343.72,0.00,343.72,-9.45,-41.25,293.02
+2023-04,2023-05,2464,302 Spring Street,Virginia,Carlos Noyes,1636.00,0.00,1636.00,-44.99,-196.32,1394.69
+2023-05,2023-06,2464,302 Spring Street,Virginia,Carlos Noyes,2794.00,0.00,2794.00,-76.83,-335.28,2381.89
+2023-06,2023-07,2464,302 Spring Street,Virginia,Carlos Noyes,2622.72,0.00,2622.72,-72.12,-314.73,2235.87
+2023-07,2023-08,2464,302 Spring Street,Virginia,Carlos Noyes,3377.50,0.00,3377.50,-92.88,-405.30,2879.32
+2023-08,2023-09,2464,302 Spring Street,Virginia,Carlos Noyes,4433.79,0.00,4433.79,-121.93,-532.05,3779.81
+2023-09,2023-10,2464,302 Spring Street,Virginia,Carlos Noyes,4380.58,0.00,4380.58,-120.47,-525.67,3734.44
+2023-10,2023-11,2464,302 Spring Street,Virginia,Carlos Noyes,3933.23,0.00,3933.23,-108.16,-471.99,3353.08
+2023-11,2023-12,2464,302 Spring Street,Virginia,Carlos Noyes,4220.85,0.00,4220.85,-116.07,-506.50,3598.27
+2023-12,2024-01,2464,302 Spring Street,Virginia,Carlos Noyes,3597.83,0.00,3597.83,-98.94,-431.74,3067.15
+2024-01,2024-02,2464,302 Spring Street,Virginia,Carlos Noyes,5145.01,0.00,5145.01,-141.49,-617.40,4386.12
+2024-02,2024-03,2464,302 Spring Street,Virginia,Carlos Noyes,4187.15,0.00,4187.15,-115.15,-502.46,3569.55
+2024-03,2024-04,2464,302 Spring Street,Virginia,Carlos Noyes,4134.00,0.00,4134.00,-113.69,-496.08,3524.24
+2024-04,2024-05,2464,302 Spring Street,Virginia,Carlos Noyes,5060.72,0.00,5060.72,-139.17,-607.29,4314.26
+2024-05,2024-06,2464,302 Spring Street,Virginia,Carlos Noyes,4008.14,0.00,4008.14,-110.22,-480.98,3416.94
+2024-06,2024-07,2464,302 Spring Street,Virginia,Carlos Noyes,3232.36,0.00,3232.36,-88.89,-387.88,2755.59
+2024-07,2024-08,2464,302 Spring Street,Virginia,Carlos Noyes,4122.50,0.00,4122.50,-113.37,-494.70,3514.43
+2024-08,2024-09,2464,302 Spring Street,Virginia,Carlos Noyes,4656.86,0.00,4656.86,-128.06,-558.82,3969.97
+2024-09,2024-10,2464,302 Spring Street,Virginia,Carlos Noyes,5054.00,0.00,5054.00,-138.99,-606.48,4308.53
+2024-10,2024-11,2464,302 Spring Street,Virginia,Carlos Noyes,4853.00,0.00,4853.00,-133.46,-582.36,4137.18
+2024-11,2024-12,2464,302 Spring Street,Virginia,Carlos Noyes,3731.07,0.00,3731.07,-102.60,-447.73,3180.74
+2024-12,2025-01,2464,302 Spring Street,Virginia,Carlos Noyes,4596.50,0.00,4596.50,-126.40,-551.58,3918.52
+2025-01,2025-02,2464,302 Spring Street,Virginia,Carlos Noyes,4520.00,0.00,4520.00,-124.30,-542.40,3853.30
+2025-02,2025-03,2464,302 Spring Street,Virginia,Carlos Noyes,3676.57,0.00,3676.57,-101.11,-441.19,3134.28
+2025-03,2025-04,2464,302 Spring Street,Virginia,Carlos Noyes,4833.05,0.00,4833.05,-132.91,-579.97,4120.18
+2025-04,2025-05,2464,302 Spring Street,Virginia,Carlos Noyes,4972.46,-214.29,4758.17,-118.87,-553.55,4085.75
+2025-05,2025-06,2464,302 Spring Street,Virginia,Carlos Noyes,5806.67,-200.00,5606.67,-121.60,-625.40,4859.67
+2025-06,2025-07,2464,302 Spring Street,Virginia,Carlos Noyes,4603.00,0.00,4603.00,-96.94,-509.24,3996.82
+2025-07,2025-08,2464,302 Spring Street,Virginia,Carlos Noyes,5083.00,0.00,5083.00,-99.72,-551.68,4431.60
+2025-08,2025-09,2464,302 Spring Street,Virginia,Carlos Noyes,4231.01,0.00,4231.01,-84.30,-461.10,3685.61
+2025-09,2025-10,2464,302 Spring Street,Virginia,Carlos Noyes,4476.85,-345.94,4130.91,-94.57,-468.03,3568.32
+2025-10,2025-11,2464,302 Spring Street,Virginia,Carlos Noyes,4144.72,-295.52,3849.20,-55.41,-388.53,3405.25
+2025-11,2025-12,2464,302 Spring Street,Virginia,Carlos Noyes,4057.24,-221.43,3835.81,-30.59,-351.36,3453.86
+2025-03,2025-04,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,3437.57,-1849.03,1588.54,0.00,-127.08,1461.46
+2025-04,2025-05,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,6624.86,-686.73,5938.13,0.00,-475.05,5463.08
+2025-05,2025-06,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,6360.71,-839.72,5520.99,0.00,-441.68,5079.31
+2025-06,2025-07,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,6796.60,-356.72,6439.88,0.00,-515.19,5924.69
+2025-07,2025-08,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,7440.70,-582.15,6858.55,0.00,-548.68,6309.87
+2025-08,2025-09,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,6256.70,-492.86,5763.84,0.00,-461.11,5302.73
+2025-09,2025-10,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,8059.71,-383.43,7676.28,0.00,-614.10,7062.18
+2025-10,2025-11,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,7261.10,-816.61,6444.49,0.00,-515.56,5928.93
+2025-11,2025-12,11596,1888 South Sycamore Street,Virginia,Carlos Noyes,6362.54,-204.85,6157.69,0.00,-492.62,5665.07
