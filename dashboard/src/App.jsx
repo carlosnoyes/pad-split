@@ -261,8 +261,106 @@ const StackedAreaChart = ({ series, months, lineValues, lineLabel }) => {
   )
 }
 
+const TxColumnDialog = ({ column, transactions, position, sortKey, sortDir, filters, onSort, onFilter, onClose }) => {
+  const uniqueValues = useMemo(() => {
+    const values = new Set()
+    transactions.forEach((tx) => {
+      const value = tx[column.key]
+      if (value !== undefined && value !== null && value !== '') {
+        if (column.type === 'date') {
+          values.add(value ? new Date(value).toLocaleDateString('en-US') : '—')
+        } else if (column.type === 'currency') {
+          return
+        } else {
+          values.add(String(value))
+        }
+      }
+    })
+    return Array.from(values).sort()
+  }, [transactions, column])
+
+  const showFilters = uniqueValues.length > 0 && uniqueValues.length <= 10
+
+  const currentFilters = filters[column.key] || null
+
+  const handleToggleValue = (value) => {
+    const current = currentFilters ? new Set(currentFilters) : new Set(uniqueValues)
+    if (current.has(value)) {
+      current.delete(value)
+    } else {
+      current.add(value)
+    }
+    onFilter(column.key, current.size === uniqueValues.length ? null : current)
+  }
+
+  return (
+    <>
+      <div className="column-dialog-overlay" onClick={onClose} />
+      <div
+        className="column-dialog"
+        style={{ top: position.top, left: position.left }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="column-dialog-section">
+          <button
+            type="button"
+            className={`column-dialog-btn ${sortKey === column.key && sortDir === 'asc' ? 'active' : ''}`}
+            onClick={() => { onSort(column.key, 'asc'); onClose() }}
+          >
+            ↑ Sort A to Z
+          </button>
+          <button
+            type="button"
+            className={`column-dialog-btn ${sortKey === column.key && sortDir === 'desc' ? 'active' : ''}`}
+            onClick={() => { onSort(column.key, 'desc'); onClose() }}
+          >
+            ↓ Sort Z to A
+          </button>
+        </div>
+        {showFilters && (
+          <div className="column-dialog-section">
+            <div className="column-dialog-title">Filter</div>
+            <div className="filter-scroll">
+              {uniqueValues.map((value) => {
+                const isChecked = !currentFilters || currentFilters.has(value)
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className="filter-option"
+                    onClick={() => handleToggleValue(value)}
+                  >
+                    <span className={`filter-checkbox ${isChecked ? 'checked' : ''}`} />
+                    <span className="filter-label">{value}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 const TransactionTable = ({ member, billedRows, collectedRows, onClose }) => {
-  const transactions = useMemo(() => {
+  const [sortKey, setSortKey] = useState('date')
+  const [sortDir, setSortDir] = useState('desc')
+  const [filters, setFilters] = useState({})
+  const [dialogColumn, setDialogColumn] = useState(null)
+  const [dialogPosition, setDialogPosition] = useState({ top: 0, left: 0 })
+
+  const columns = useMemo(() => [
+    { key: 'date', label: 'Date', type: 'date' },
+    { key: 'type', label: 'Type', type: 'text' },
+    { key: 'description', label: 'Description', type: 'text' },
+    { key: 'amount', label: 'Billed', type: 'currency' },
+    { key: 'gross', label: 'Collected', type: 'currency' },
+    { key: 'fees', label: 'Management', type: 'currency' },
+    { key: 'host', label: 'Net', type: 'currency' },
+  ], [])
+
+  const allTransactions = useMemo(() => {
     const memberId = member.memberId
     const billed = billedRows
       .filter((row) => row['Member ID'] === memberId)
@@ -291,12 +389,92 @@ const TransactionTable = ({ member, billedRows, collectedRows, onClose }) => {
         fees: Math.abs(toNumber(row['Total Fees'])),
         host: toNumber(row['Host Earnings']),
       }))
-    return [...billed, ...collected].sort((a, b) => {
-      const aTime = a.date ? new Date(a.date).getTime() : 0
-      const bTime = b.date ? new Date(b.date).getTime() : 0
-      return bTime - aTime
-    })
+    return [...billed, ...collected]
   }, [member.memberId, billedRows, collectedRows])
+
+  const filteredTransactions = useMemo(() => {
+    const filterKeys = Object.keys(filters)
+    if (filterKeys.length === 0) return allTransactions
+
+    return allTransactions.filter((tx) => {
+      return filterKeys.every((key) => {
+        const allowedValues = filters[key]
+        if (!allowedValues || allowedValues.size === 0) return false
+        const column = columns.find((c) => c.key === key)
+        let txValue = tx[key]
+        if (column?.type === 'date') {
+          txValue = txValue ? new Date(txValue).toLocaleDateString('en-US') : '—'
+        } else {
+          txValue = String(txValue)
+        }
+        return allowedValues.has(txValue)
+      })
+    })
+  }, [allTransactions, filters, columns])
+
+  const sortedTransactions = useMemo(() => {
+    const sorted = [...filteredTransactions]
+    const multiplier = sortDir === 'asc' ? 1 : -1
+    sorted.sort((a, b) => {
+      const aVal = a[sortKey]
+      const bVal = b[sortKey]
+
+      if (sortKey === 'date') {
+        const aTime = aVal ? new Date(aVal).getTime() : 0
+        const bTime = bVal ? new Date(bVal).getTime() : 0
+        return (aTime - bTime) * multiplier
+      }
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return (aVal - bVal) * multiplier
+      }
+
+      if (aVal === null && bVal === null) return 0
+      if (aVal === null) return 1 * multiplier
+      if (bVal === null) return -1 * multiplier
+
+      return String(aVal).localeCompare(String(bVal)) * multiplier
+    })
+    return sorted
+  }, [filteredTransactions, sortDir, sortKey])
+
+  const handleHeaderClick = (column, event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    setDialogPosition({
+      top: rect.bottom + 4,
+      left: Math.max(8, rect.left),
+    })
+    setDialogColumn(column)
+  }
+
+  const handleSort = (key, dir) => {
+    setSortKey(key)
+    setSortDir(dir)
+  }
+
+  const handleFilter = (key, values) => {
+    setFilters((prev) => {
+      const next = { ...prev }
+      if (values === null) {
+        delete next[key]
+      } else {
+        next[key] = values
+      }
+      return next
+    })
+  }
+
+  const formatCell = (tx, column) => {
+    const value = tx[column.key]
+    switch (column.type) {
+      case 'currency':
+        return value !== null ? formatCurrency(value) : '—'
+      case 'date':
+        return value ? new Date(value).toLocaleDateString('en-US') : '—'
+      default:
+        return value || '—'
+    }
+  }
 
   return (
     <div className="transaction-overlay" onClick={onClose}>
@@ -312,24 +490,42 @@ const TransactionTable = ({ member, billedRows, collectedRows, onClose }) => {
         </div>
         <div className="transaction-table">
           <div className="transaction-head">
-            <span>Date</span>
-            <span>Type</span>
-            <span>Description</span>
-            <span>Billed</span>
-            <span>Collected</span>
-            <span>Management</span>
-            <span>Net</span>
+            {columns.map((column) => (
+              <button
+                key={column.key}
+                type="button"
+                className={`tx-sort ${sortKey === column.key ? 'active' : ''}${filters[column.key] ? ' filtered' : ''}`}
+                onClick={(e) => handleHeaderClick(column, e)}
+              >
+                <em>{sortKey === column.key ? (sortDir === 'asc' ? '↑ ' : '↓ ') : ''}</em>
+                <span>{column.label}</span>
+                {filters[column.key] && <span className="filter-indicator">●</span>}
+              </button>
+            ))}
           </div>
+          {dialogColumn && (
+            <TxColumnDialog
+              column={dialogColumn}
+              transactions={allTransactions}
+              position={dialogPosition}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              filters={filters}
+              onSort={handleSort}
+              onFilter={handleFilter}
+              onClose={() => setDialogColumn(null)}
+            />
+          )}
           <div className="transaction-body">
-            {transactions.map((tx, index) => (
+            {sortedTransactions.map((tx, index) => (
               <div key={index} className={`transaction-row ${tx.type.toLowerCase()}`}>
-                <span>{tx.date ? new Date(tx.date).toLocaleDateString('en-US') : '—'}</span>
+                <span>{formatCell(tx, columns[0])}</span>
                 <span className={`tx-type ${tx.type.toLowerCase()}`}>{tx.type}</span>
                 <span>{tx.description}</span>
-                <span>{tx.amount !== null ? formatCurrency(tx.amount) : '—'}</span>
-                <span>{tx.gross !== null ? formatCurrency(tx.gross) : '—'}</span>
-                <span>{tx.fees !== null ? formatCurrency(tx.fees) : '—'}</span>
-                <span>{tx.host !== null ? formatCurrency(tx.host) : '—'}</span>
+                <span>{formatCell(tx, columns[3])}</span>
+                <span>{formatCell(tx, columns[4])}</span>
+                <span>{formatCell(tx, columns[5])}</span>
+                <span>{formatCell(tx, columns[6])}</span>
               </div>
             ))}
           </div>
@@ -361,13 +557,100 @@ const TransactionTable = ({ member, billedRows, collectedRows, onClose }) => {
   )
 }
 
+const ColumnDialog = ({ column, members, position, sortKey, sortDir, filters, onSort, onFilter, onClose }) => {
+  const uniqueValues = useMemo(() => {
+    const values = new Set()
+    members.forEach((member) => {
+      const value = member[column.key]
+      if (value !== undefined && value !== null && value !== '') {
+        if (column.type === 'date') {
+          values.add(value ? new Date(value).toLocaleDateString('en-US') : '—')
+        } else if (column.type === 'status') {
+          values.add(value || 'Past')
+        } else if (column.type === 'currency' || column.type === 'percent' || column.type === 'number') {
+          return
+        } else {
+          values.add(String(value))
+        }
+      }
+    })
+    return Array.from(values).sort()
+  }, [members, column])
+
+  const showFilters = uniqueValues.length > 0 && uniqueValues.length <= 10
+
+  const currentFilters = filters[column.key] || null
+
+  const handleToggleValue = (value) => {
+    const current = currentFilters ? new Set(currentFilters) : new Set(uniqueValues)
+    if (current.has(value)) {
+      current.delete(value)
+    } else {
+      current.add(value)
+    }
+    onFilter(column.key, current.size === uniqueValues.length ? null : current)
+  }
+
+  return (
+    <>
+      <div className="column-dialog-overlay" onClick={onClose} />
+      <div
+        className="column-dialog"
+        style={{ top: position.top, left: position.left }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="column-dialog-section">
+          <button
+            type="button"
+            className={`column-dialog-btn ${sortKey === column.key && sortDir === 'asc' ? 'active' : ''}`}
+            onClick={() => { onSort(column.key, 'asc'); onClose() }}
+          >
+            ↑ Sort A to Z
+          </button>
+          <button
+            type="button"
+            className={`column-dialog-btn ${sortKey === column.key && sortDir === 'desc' ? 'active' : ''}`}
+            onClick={() => { onSort(column.key, 'desc'); onClose() }}
+          >
+            ↓ Sort Z to A
+          </button>
+        </div>
+        {showFilters && (
+          <div className="column-dialog-section">
+            <div className="column-dialog-title">Filter</div>
+            <div className="filter-scroll">
+              {uniqueValues.map((value) => {
+                const isChecked = !currentFilters || currentFilters.has(value)
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className="filter-option"
+                    onClick={() => handleToggleValue(value)}
+                  >
+                    <span className={`filter-checkbox ${isChecked ? 'checked' : ''}`} />
+                    <span className="filter-label">{value}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 const MemberTable = ({ members, billedRows, collectedRows }) => {
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState('collectedTotal')
   const [sortDir, setSortDir] = useState('desc')
   const [selectedMember, setSelectedMember] = useState(null)
+  const [dialogColumn, setDialogColumn] = useState(null)
+  const [dialogPosition, setDialogPosition] = useState({ top: 0, left: 0 })
+  const [filters, setFilters] = useState({})
 
-  const columns = [
+  const columns = useMemo(() => [
     { key: 'name', label: 'Member', type: 'text' },
     { key: 'moveIn', label: 'Move in', type: 'date' },
     { key: 'moveOut', label: 'Move out', type: 'date' },
@@ -380,23 +663,74 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
     { key: 'feePercent', label: '% From Fees', type: 'percent' },
     { key: 'monthlyRent', label: 'Monthly Rent', type: 'currency' },
     { key: 'balanceGrowthRate', label: 'Balance Growth Rate', type: 'currency' },
-  ]
+  ], [])
+
+  const handleHeaderClick = (column, event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    setDialogPosition({
+      top: rect.bottom + 4,
+      left: Math.max(8, rect.left),
+    })
+    setDialogColumn(column)
+  }
+
+  const handleSort = (key, dir) => {
+    setSortKey(key)
+    setSortDir(dir)
+  }
+
+  const handleFilter = (key, values) => {
+    setFilters((prev) => {
+      const next = { ...prev }
+      if (values === null) {
+        delete next[key]
+      } else {
+        next[key] = values
+      }
+      return next
+    })
+  }
 
   const filteredMembers = useMemo(() => {
+    let result = members
+
     const normalized = query.trim().toLowerCase()
-    if (!normalized) return members
-    return members.filter((member) => {
-      const haystack = [
-        member.name,
-        member.memberId,
-        member.market,
-        member.roomId,
-      ]
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(normalized)
-    })
-  }, [members, query])
+    if (normalized) {
+      result = result.filter((member) => {
+        const haystack = [
+          member.name,
+          member.memberId,
+          member.market,
+          member.roomId,
+        ]
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(normalized)
+      })
+    }
+
+    const filterKeys = Object.keys(filters)
+    if (filterKeys.length > 0) {
+      result = result.filter((member) => {
+        return filterKeys.every((key) => {
+          const allowedValues = filters[key]
+          if (!allowedValues || allowedValues.size === 0) return false
+          const column = columns.find((c) => c.key === key)
+          let memberValue = member[key]
+          if (column?.type === 'date') {
+            memberValue = memberValue ? new Date(memberValue).toLocaleDateString('en-US') : '—'
+          } else if (column?.type === 'status') {
+            memberValue = memberValue || 'Past'
+          } else {
+            memberValue = String(memberValue)
+          }
+          return allowedValues.has(memberValue)
+        })
+      })
+    }
+
+    return result
+  }, [members, query, filters, columns])
 
   const sortedMembers = useMemo(() => {
     const sorted = [...filteredMembers]
@@ -419,15 +753,6 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
     })
     return sorted
   }, [filteredMembers, sortDir, sortKey])
-
-  const toggleSort = (key) => {
-    if (key === sortKey) {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-      return
-    }
-    setSortKey(key)
-    setSortDir(key === 'name' ? 'asc' : 'desc')
-  }
 
   const formatCell = (member, column) => {
     const value = member[column.key]
@@ -471,14 +796,28 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
             <button
               key={column.key}
               type="button"
-              className={`table-sort ${sortKey === column.key ? 'active' : ''}`}
-              onClick={() => toggleSort(column.key)}
+              className={`table-sort ${sortKey === column.key ? 'active' : ''}${filters[column.key] ? ' filtered' : ''}`}
+              onClick={(e) => handleHeaderClick(column, e)}
             >
               <em>{sortKey === column.key ? (sortDir === 'asc' ? '↑ ' : '↓ ') : ''}</em>
               <span>{column.label}</span>
+              {filters[column.key] && <span className="filter-indicator">●</span>}
             </button>
           ))}
         </div>
+        {dialogColumn && (
+          <ColumnDialog
+            column={dialogColumn}
+            members={members}
+            position={dialogPosition}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            filters={filters}
+            onSort={handleSort}
+            onFilter={handleFilter}
+            onClose={() => setDialogColumn(null)}
+          />
+        )}
         <div className="table-body">
           {sortedMembers.map((member) => (
             <div
