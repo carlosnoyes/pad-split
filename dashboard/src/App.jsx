@@ -80,6 +80,9 @@ const formatNumber = (value) =>
     maximumFractionDigits: 2,
   }).format(value)
 
+const formatTxnLabel = (value) =>
+  value ? value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) : ''
+
 const monthLabel = (month) => {
   if (!month) return ''
   const [year, mon] = month.split('-')
@@ -88,6 +91,14 @@ const monthLabel = (month) => {
 }
 
 const getMonthKey = (dateText) => (dateText ? dateText.slice(0, 7) : '')
+const getMemberStatus = (lastBilledDate, latestBillDate) => {
+  if (!lastBilledDate || !latestBillDate) return 'Past'
+  const lastTime = lastBilledDate.getTime()
+  const latestTime = latestBillDate.getTime()
+  if (!Number.isFinite(lastTime) || !Number.isFinite(latestTime)) return 'Past'
+  const fourWeeksMs = 28 * 24 * 60 * 60 * 1000
+  return latestTime - lastTime <= fourWeeksMs ? 'Active' : 'Past'
+}
 
 const areaColors = [
   '#d66b4a',
@@ -255,15 +266,20 @@ const TransactionTable = ({ member, billedRows, collectedRows, onClose }) => {
     const memberId = member.memberId
     const billed = billedRows
       .filter((row) => row['Member ID'] === memberId)
-      .map((row) => ({
-        date: row['Created'] || '',
-        type: 'Billed',
-        description: row['Bill Type'] || 'Charge',
-        amount: Math.abs(toNumber(row['Amount'])),
-        gross: null,
-        fees: null,
-        host: null,
-      }))
+      .map((row) => {
+        const type = formatTxnLabel(row['Transaction Type'])
+        const reason = formatTxnLabel(row['Transaction Reason'])
+        const description = [type, reason].filter(Boolean).join(' - ') || 'Charge'
+        return {
+          date: row['Created'] || '',
+          type: 'Billed',
+          description,
+          amount: -toNumber(row['Amount']),
+          gross: null,
+          fees: null,
+          host: null,
+        }
+      })
     const collected = collectedRows
       .filter((row) => row['Member ID'] === memberId)
       .map((row) => ({
@@ -288,7 +304,7 @@ const TransactionTable = ({ member, billedRows, collectedRows, onClose }) => {
         <div className="transaction-header">
           <div>
             <h3>{member.name || `Member ${member.memberId}`}</h3>
-            <p>Room {member.roomId} • {member.market}</p>
+            <p>{member.street1} - {member.roomNumber}</p>
           </div>
           <button type="button" className="close-button" onClick={onClose}>
             ×
@@ -355,6 +371,7 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
     { key: 'name', label: 'Member', type: 'text' },
     { key: 'moveIn', label: 'Move in', type: 'date' },
     { key: 'moveOut', label: 'Move out', type: 'date' },
+    { key: 'status', label: 'Status', type: 'status' },
     { key: 'lengthOfStay', label: 'Length (days)', type: 'number' },
     { key: 'billedTotal', label: 'Billed', type: 'currency' },
     { key: 'collectedTotal', label: 'Collected', type: 'currency' },
@@ -423,6 +440,8 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
         return value ? new Date(value).toLocaleDateString('en-US') : '—'
       case 'number':
         return formatNumber(value)
+      case 'status':
+        return value || 'Past'
       default:
         return value || '—'
     }
@@ -473,7 +492,7 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
                     <>
                       {member.name || `Member ${member.memberId}`}
                       <small>
-                        Room {member.roomId} • {member.market}
+                        {member.street1} - {member.roomNumber}
                       </small>
                     </>
                   ) : (
@@ -628,6 +647,8 @@ function App() {
         name: `${row['Member First Name'] || ''} ${row['Member Last Name'] || ''}`.trim(),
         market: row['PadSplit Market'] || '',
         roomId: row['Room ID'] || '',
+        street1: row['Street 1'] || '',
+        roomNumber: row['Room Number'] || '',
         propertyId: row['Property ID'] || '',
         billedTotal: 0,
         collectedTotal: 0,
@@ -640,21 +661,29 @@ function App() {
         maxDate: null,
         memberMonthTotals: new Map(),
         transactionsByDate: [],
+        lastBilledDate: null,
       }
       updater(member)
       memberMap.set(memberId, member)
     }
 
+    let latestBillDate = null
     billedRows.forEach((row) => {
-      const amount = Math.abs(toNumber(row['Amount']))
+      const amount = -toNumber(row['Amount'])
       const date = row['Created']
       updateMember(row, (member) => {
         member.billedTotal += amount
         member.billCount += 1
         const currentDate = date ? new Date(date) : null
         if (currentDate) {
+          if (!latestBillDate || currentDate > latestBillDate) {
+            latestBillDate = currentDate
+          }
           member.minDate = member.minDate ? new Date(Math.min(member.minDate, currentDate)) : currentDate
           member.maxDate = member.maxDate ? new Date(Math.max(member.maxDate, currentDate)) : currentDate
+          member.lastBilledDate = member.lastBilledDate
+            ? new Date(Math.max(member.lastBilledDate, currentDate))
+            : currentDate
           member.transactionsByDate.push({ date: currentDate, billed: amount, collected: 0 })
         }
       })
@@ -754,6 +783,7 @@ function App() {
         vsAvg: vsAvgCount ? vsAvgTotal / vsAvgCount : 0,
         moveIn: member.minDate ? member.minDate.toISOString() : '',
         moveOut: member.maxDate ? member.maxDate.toISOString() : '',
+        status: getMemberStatus(member.lastBilledDate, latestBillDate),
         collectedPerDay,
         monthlyRent,
         hostPercent,
