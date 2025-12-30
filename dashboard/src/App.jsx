@@ -557,6 +557,268 @@ const TransactionTable = ({ member, billedRows, collectedRows, onClose }) => {
   )
 }
 
+const ScatterPlot = ({ members, xColumn, yColumn, onClose }) => {
+  const [hoveredPoint, setHoveredPoint] = useState(null)
+
+  // Convert value to number (handles dates by converting to timestamps)
+  const toNumeric = (value, column) => {
+    if (value == null) return null
+    if (column.type === 'date') {
+      return value ? new Date(value).getTime() : null
+    }
+    return typeof value === 'number' ? value : null
+  }
+
+  // Filter out members with valid numeric values for both columns
+  const validMembers = useMemo(() => {
+    return members.filter(member => {
+      const xVal = toNumeric(member[xColumn.key], xColumn)
+      const yVal = toNumeric(member[yColumn.key], yColumn)
+      return xVal != null && yVal != null && !isNaN(xVal) && !isNaN(yVal)
+    })
+  }, [members, xColumn, yColumn])
+
+  // Calculate correlation coefficient
+  const correlation = useMemo(() => {
+    if (validMembers.length < 2) return 0
+
+    const xValues = validMembers.map(m => toNumeric(m[xColumn.key], xColumn))
+    const yValues = validMembers.map(m => toNumeric(m[yColumn.key], yColumn))
+
+    const n = validMembers.length
+    const sumX = xValues.reduce((a, b) => a + b, 0)
+    const sumY = yValues.reduce((a, b) => a + b, 0)
+    const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0)
+    const sumX2 = xValues.reduce((sum, x) => sum + x * x, 0)
+    const sumY2 = yValues.reduce((sum, y) => sum + y * y, 0)
+
+    const numerator = n * sumXY - sumX * sumY
+    const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY))
+
+    return denominator === 0 ? 0 : numerator / denominator
+  }, [validMembers, xColumn, yColumn])
+
+  // Calculate chart dimensions and scales
+  const { xMin, xMax, yMin, yMax, xScale, yScale } = useMemo(() => {
+    if (validMembers.length === 0) {
+      return { xMin: 0, xMax: 1, yMin: 0, yMax: 1, xScale: () => 0, yScale: () => 0 }
+    }
+
+    const xValues = validMembers.map(m => toNumeric(m[xColumn.key], xColumn))
+    const yValues = validMembers.map(m => toNumeric(m[yColumn.key], yColumn))
+
+    const xMin = Math.min(...xValues)
+    const xMax = Math.max(...xValues)
+    const yMin = Math.min(...yValues)
+    const yMax = Math.max(...yValues)
+
+    const xPadding = (xMax - xMin) * 0.1 || 1
+    const yPadding = (yMax - yMin) * 0.1 || 1
+
+    // Don't let axis go negative if all data is non-negative
+    const xMinWithPadding = xMin >= 0 ? Math.max(0, xMin - xPadding) : xMin - xPadding
+    const yMinWithPadding = yMin >= 0 ? Math.max(0, yMin - yPadding) : yMin - yPadding
+
+    const chartWidth = 600
+    const chartHeight = 400
+    const margin = { top: 20, right: 20, bottom: 60, left: 80 }
+
+    const xScale = (value) => {
+      return margin.left + ((value - xMinWithPadding) / ((xMax + xPadding) - xMinWithPadding)) * (chartWidth - margin.left - margin.right)
+    }
+
+    const yScale = (value) => {
+      return chartHeight - margin.bottom - ((value - yMinWithPadding) / ((yMax + yPadding) - yMinWithPadding)) * (chartHeight - margin.top - margin.bottom)
+    }
+
+    return { xMin: xMinWithPadding, xMax: xMax + xPadding, yMin: yMinWithPadding, yMax: yMax + yPadding, xScale, yScale }
+  }, [validMembers, xColumn, yColumn])
+
+  const formatValue = (value, column) => {
+    if (column.type === 'date') return value ? new Date(value).toLocaleDateString('en-US') : '—'
+    if (column.type === 'currency') return formatCurrency(value)
+    if (column.type === 'percent') return `${formatNumber(value * 100)}%`
+    return formatNumber(value)
+  }
+
+  const formatAxisValue = (value, column) => {
+    if (column.type === 'date') {
+      const date = new Date(value)
+      return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear().toString().substring(2)}`
+    }
+    if (column.type === 'currency') return `$${Math.round(value)}`
+    if (column.type === 'percent') return `${Math.round(value * 100)}%`
+    return Math.round(value).toString()
+  }
+
+  const chartWidth = 600
+  const chartHeight = 400
+  const margin = { top: 20, right: 20, bottom: 60, left: 80 }
+
+  return (
+    <div className="transaction-overlay" onClick={onClose}>
+      <div className="scatter-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="transaction-header">
+          <div>
+            <h3>Scatter Plot</h3>
+            <p>
+              {xColumn.label} vs {yColumn.label} • Correlation: {correlation.toFixed(3)}
+            </p>
+          </div>
+          <button type="button" className="close-button" onClick={onClose}>×</button>
+        </div>
+        <div className="scatter-content">
+          <svg width={chartWidth} height={chartHeight}>
+            {/* Grid lines */}
+            <g className="scatter-grid">
+              {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+                const x = margin.left + t * (chartWidth - margin.left - margin.right)
+                const y = chartHeight - margin.bottom - t * (chartHeight - margin.top - margin.bottom)
+                return (
+                  <g key={t}>
+                    <line
+                      x1={x}
+                      y1={margin.top}
+                      x2={x}
+                      y2={chartHeight - margin.bottom}
+                      stroke="rgba(31, 27, 23, 0.08)"
+                      strokeDasharray="4 6"
+                    />
+                    <line
+                      x1={margin.left}
+                      y1={y}
+                      x2={chartWidth - margin.right}
+                      y2={y}
+                      stroke="rgba(31, 27, 23, 0.08)"
+                      strokeDasharray="4 6"
+                    />
+                  </g>
+                )
+              })}
+            </g>
+
+            {/* X axis */}
+            <g className="scatter-axis">
+              <line
+                x1={margin.left}
+                y1={chartHeight - margin.bottom}
+                x2={chartWidth - margin.right}
+                y2={chartHeight - margin.bottom}
+                stroke="rgba(31, 27, 23, 0.3)"
+                strokeWidth="2"
+              />
+              {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+                const value = xMin + t * (xMax - xMin)
+                const x = margin.left + t * (chartWidth - margin.left - margin.right)
+                return (
+                  <text
+                    key={t}
+                    x={x}
+                    y={chartHeight - margin.bottom + 20}
+                    textAnchor="middle"
+                    fill="var(--muted)"
+                    fontSize="0.7rem"
+                  >
+                    {formatAxisValue(value, xColumn)}
+                  </text>
+                )
+              })}
+              <text
+                x={chartWidth / 2}
+                y={chartHeight - 10}
+                textAnchor="middle"
+                fill="var(--ink)"
+                fontSize="0.85rem"
+                fontWeight="500"
+              >
+                {xColumn.label}
+              </text>
+            </g>
+
+            {/* Y axis */}
+            <g className="scatter-axis">
+              <line
+                x1={margin.left}
+                y1={margin.top}
+                x2={margin.left}
+                y2={chartHeight - margin.bottom}
+                stroke="rgba(31, 27, 23, 0.3)"
+                strokeWidth="2"
+              />
+              {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+                const value = yMin + t * (yMax - yMin)
+                const y = chartHeight - margin.bottom - t * (chartHeight - margin.top - margin.bottom)
+                return (
+                  <text
+                    key={t}
+                    x={margin.left - 10}
+                    y={y}
+                    textAnchor="end"
+                    alignmentBaseline="middle"
+                    fill="var(--muted)"
+                    fontSize="0.7rem"
+                  >
+                    {formatAxisValue(value, yColumn)}
+                  </text>
+                )
+              })}
+              <text
+                x={-chartHeight / 2}
+                y={20}
+                textAnchor="middle"
+                transform={`rotate(-90, 20, ${chartHeight / 2})`}
+                fill="var(--ink)"
+                fontSize="0.85rem"
+                fontWeight="500"
+              >
+                {yColumn.label}
+              </text>
+            </g>
+
+            {/* Data points */}
+            <g className="scatter-points">
+              {validMembers.map((member) => {
+                const x = xScale(toNumeric(member[xColumn.key], xColumn))
+                const y = yScale(toNumeric(member[yColumn.key], yColumn))
+                const isHovered = hoveredPoint === member.memberId
+                return (
+                  <circle
+                    key={member.memberId}
+                    cx={x}
+                    cy={y}
+                    r={isHovered ? 8 : 5}
+                    fill={isHovered ? 'var(--terra)' : 'var(--blue)'}
+                    opacity={isHovered ? 1 : 0.6}
+                    onMouseEnter={() => setHoveredPoint(member.memberId)}
+                    onMouseLeave={() => setHoveredPoint(null)}
+                    style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                  />
+                )
+              })}
+            </g>
+          </svg>
+
+          {/* Tooltip */}
+          {hoveredPoint && validMembers.find(m => m.memberId === hoveredPoint) && (
+            <div className="scatter-tooltip">
+              {(() => {
+                const member = validMembers.find(m => m.memberId === hoveredPoint)
+                return (
+                  <>
+                    <strong>{member.name || `Member ${member.memberId}`}</strong>
+                    <div>{xColumn.label}: {formatValue(member[xColumn.key], xColumn)}</div>
+                    <div>{yColumn.label}: {formatValue(member[yColumn.key], yColumn)}</div>
+                  </>
+                )
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const ColumnDialog = ({ column, members, position, sortKey, sortDir, filters, onSort, onFilter, onClose }) => {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -670,6 +932,9 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
   const [dialogColumn, setDialogColumn] = useState(null)
   const [dialogPosition, setDialogPosition] = useState({ top: 0, left: 0 })
   const [filters, setFilters] = useState({})
+  const [scatterMode, setScatterMode] = useState(false)
+  const [scatterColumns, setScatterColumns] = useState([])
+  const [showScatterPlot, setShowScatterPlot] = useState(false)
 
   const columns = useMemo(() => [
     { key: 'name', label: 'Member', type: 'text' },
@@ -687,12 +952,43 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
   ], [])
 
   const handleHeaderClick = (column, event) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    setDialogPosition({
-      top: rect.bottom + 4,
-      left: Math.max(8, rect.left),
-    })
-    setDialogColumn(column)
+    if (scatterMode) {
+      // In scatter mode, select columns for scatter plot
+      // Allow numeric types and dates (dates will be converted to timestamps)
+      if (column.type === 'number' || column.type === 'currency' || column.type === 'percent' || column.type === 'date') {
+        if (scatterColumns.length < 2) {
+          const newColumns = [...scatterColumns, column]
+          setScatterColumns(newColumns)
+          if (newColumns.length === 2) {
+            setShowScatterPlot(true)
+            setScatterMode(false)
+          }
+        }
+      }
+    } else {
+      // Normal mode: show sort/filter dialog
+      const rect = event.currentTarget.getBoundingClientRect()
+      setDialogPosition({
+        top: rect.bottom + 4,
+        left: Math.max(8, rect.left),
+      })
+      setDialogColumn(column)
+    }
+  }
+
+  const handleScatterButtonClick = () => {
+    setScatterMode(true)
+    setScatterColumns([])
+  }
+
+  const handleCancelScatter = () => {
+    setScatterMode(false)
+    setScatterColumns([])
+  }
+
+  const handleCloseScatterPlot = () => {
+    setShowScatterPlot(false)
+    setScatterColumns([])
   }
 
   const handleSort = (key, dir) => {
@@ -782,18 +1078,22 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
     <div className="panel member-table-panel">
       <div className="member-table">
         <div className="table-head sticky">
-          {columns.map((column) => (
-            <button
-              key={column.key}
-              type="button"
-              className={`table-sort ${sortKey === column.key ? 'active' : ''}${filters[column.key] ? ' filtered' : ''}`}
-              onClick={(e) => handleHeaderClick(column, e)}
-            >
-              <em>{sortKey === column.key ? (sortDir === 'asc' ? '↑ ' : '↓ ') : ''}</em>
-              <span>{column.label}</span>
-              {filters[column.key] && <span className="filter-indicator">●</span>}
-            </button>
-          ))}
+          {columns.map((column) => {
+            const isSelected = scatterColumns.some(col => col.key === column.key)
+            const isSelectable = scatterMode && (column.type === 'number' || column.type === 'currency' || column.type === 'percent' || column.type === 'date')
+            return (
+              <button
+                key={column.key}
+                type="button"
+                className={`table-sort ${sortKey === column.key ? 'active' : ''}${filters[column.key] ? ' filtered' : ''}${isSelected ? ' scatter-selected' : ''}${isSelectable ? ' scatter-selectable' : ''}`}
+                onClick={(e) => handleHeaderClick(column, e)}
+              >
+                <em>{sortKey === column.key ? (sortDir === 'asc' ? '↑ ' : '↓ ') : ''}</em>
+                <span>{column.label}</span>
+                {filters[column.key] && <span className="filter-indicator">●</span>}
+              </button>
+            )
+          })}
         </div>
         {dialogColumn && (
           <ColumnDialog
@@ -833,12 +1133,37 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
           ))}
         </div>
       </div>
+      <div className="table-floating-controls">
+        {scatterMode ? (
+          <div className="scatter-mode-banner">
+            <span>
+              Select {scatterColumns.length === 0 ? 'first' : 'second'} column for scatter plot
+              {scatterColumns.length > 0 && ` (X-axis: ${scatterColumns[0].label})`}
+            </span>
+            <button type="button" onClick={handleCancelScatter} className="cancel-scatter-btn">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={handleScatterButtonClick} className="scatter-button">
+            Scatter
+          </button>
+        )}
+      </div>
       {selectedMember && (
         <TransactionTable
           member={selectedMember}
           billedRows={billedRows}
           collectedRows={collectedRows}
           onClose={() => setSelectedMember(null)}
+        />
+      )}
+      {showScatterPlot && scatterColumns.length === 2 && (
+        <ScatterPlot
+          members={sortedMembers}
+          xColumn={scatterColumns[0]}
+          yColumn={scatterColumns[1]}
+          onClose={handleCloseScatterPlot}
         />
       )}
     </div>
