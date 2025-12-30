@@ -644,6 +644,17 @@
   color: var(--muted);
 }
 
+.column-search-input {
+  width: calc(100% - 28px);
+  margin: 8px 14px;
+  padding: 8px 12px;
+  border: 1px solid rgba(31, 27, 23, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
 .filter-option {
   display: flex;
   align-items: center;

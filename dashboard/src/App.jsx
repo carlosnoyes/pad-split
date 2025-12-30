@@ -558,6 +558,8 @@ const TransactionTable = ({ member, billedRows, collectedRows, onClose }) => {
 }
 
 const ColumnDialog = ({ column, members, position, sortKey, sortDir, filters, onSort, onFilter, onClose }) => {
+  const [searchQuery, setSearchQuery] = useState('')
+
   const uniqueValues = useMemo(() => {
     const values = new Set()
     members.forEach((member) => {
@@ -578,6 +580,13 @@ const ColumnDialog = ({ column, members, position, sortKey, sortDir, filters, on
   }, [members, column])
 
   const showFilters = uniqueValues.length > 0 && uniqueValues.length <= 10
+  const showSearch = column.type === 'text' && uniqueValues.length > 10
+
+  const filteredUniqueValues = useMemo(() => {
+    if (!searchQuery.trim()) return uniqueValues
+    const normalized = searchQuery.trim().toLowerCase()
+    return uniqueValues.filter(value => value.toLowerCase().includes(normalized))
+  }, [uniqueValues, searchQuery])
 
   const currentFilters = filters[column.key] || null
 
@@ -615,11 +624,24 @@ const ColumnDialog = ({ column, members, position, sortKey, sortDir, filters, on
             ↓ Sort Z to A
           </button>
         </div>
-        {showFilters && (
+        {showSearch && (
+          <div className="column-dialog-section">
+            <div className="column-dialog-title">Search</div>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Search ${column.label}...`}
+              className="column-search-input"
+              autoFocus
+            />
+          </div>
+        )}
+        {(showFilters || showSearch) && (
           <div className="column-dialog-section">
             <div className="column-dialog-title">Filter</div>
             <div className="filter-scroll">
-              {uniqueValues.map((value) => {
+              {filteredUniqueValues.map((value) => {
                 const isChecked = !currentFilters || currentFilters.has(value)
                 return (
                   <button
@@ -642,7 +664,6 @@ const ColumnDialog = ({ column, members, position, sortKey, sortDir, filters, on
 }
 
 const MemberTable = ({ members, billedRows, collectedRows }) => {
-  const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState('collectedTotal')
   const [sortDir, setSortDir] = useState('desc')
   const [selectedMember, setSelectedMember] = useState(null)
@@ -694,21 +715,6 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
   const filteredMembers = useMemo(() => {
     let result = members
 
-    const normalized = query.trim().toLowerCase()
-    if (normalized) {
-      result = result.filter((member) => {
-        const haystack = [
-          member.name,
-          member.memberId,
-          member.market,
-          member.roomId,
-        ]
-          .join(' ')
-          .toLowerCase()
-        return haystack.includes(normalized)
-      })
-    }
-
     const filterKeys = Object.keys(filters)
     if (filterKeys.length > 0) {
       result = result.filter((member) => {
@@ -730,7 +736,7 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
     }
 
     return result
-  }, [members, query, filters, columns])
+  }, [members, filters, columns])
 
   const sortedMembers = useMemo(() => {
     const sorted = [...filteredMembers]
@@ -774,22 +780,6 @@ const MemberTable = ({ members, billedRows, collectedRows }) => {
 
   return (
     <div className="panel member-table-panel">
-      <div className="panel-header table-header">
-        <div>
-          <h2>Member KPI table</h2>
-          <p>Search, sort, and compare every renter in one place.</p>
-        </div>
-        <div className="table-controls">
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search member, room, market..."
-            aria-label="Search members"
-          />
-          <span>{formatNumber(sortedMembers.length)} members</span>
-        </div>
-      </div>
       <div className="member-table">
         <div className="table-head sticky">
           {columns.map((column) => (
